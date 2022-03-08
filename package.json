@@ -1,9 +1,13 @@
 {
 	"name": "better-java-tests",
 	"publisher": "Yuvix25",
-	"displayName": "BetterJavaTests",
+	"displayName": "Better Java Tests",
 	"description": "An easier interface for the Java Tests.",
 	"version": "0.0.1",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Yuvix25/better-java-tests"
+	},
 	"engines": {
 		"vscode": "^1.65.0"
 	},
@@ -20,14 +24,29 @@
 				"command": "better-java-tests.createTests",
 				"title": "Create Java Tests"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Better Java Tests",
+			"properties": {
+				"better-java-tests.useCodex": {
+					"type": "boolean",
+					"description": "Use Codex (AI) to automaticly generate a tester. (experimental)",
+					"default": false
+				},
+				"better-java-tests.openAiKey": {
+					"type": "string",
+					"description": "Open AI API Key",
+					"default": ""
+				}
+			}
+		}
 	},
 	"scripts": {
 		"lint": "eslint .",
 		"pretest": "npm run lint",
 		"test": "node ./test/runTest.js"
 	},
-	"devDependencies": {
+	"dependencies": {
 		"@types/glob": "^7.2.0",
 		"@types/mocha": "^9.1.0",
 		"@types/node": "14.x",
@@ -40,7 +59,7 @@
 		"lodash": "^4.17.21",
 		"mocha": "^9.2.1",
 		"openai": "^2.0.4",
-		"typescript": "^4.5.5"
-	},
-	"dependencies": {}
+		"typescript": "^4.5.5",
+		"java-parser": "^2.0.1"
+	}
 }

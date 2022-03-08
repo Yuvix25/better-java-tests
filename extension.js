@@ -3,14 +3,82 @@ const fs = require('fs');
 const path = require('path');
 const { enableTests } = require('./dependenciesDownloader');
 
-const useCodex = false;
-var codexCompletion;
+const codexCompletion = require('./completions').codexCompletion;
 
-if (useCodex) { 
-	codexCompletion = require('./completions').codexCompletion;
+const { parse } = require("java-parser");
+
+
+function sleep(ms) {
+	return new Promise((resolve) => {
+	    setTimeout(resolve, ms);
+	});
 }
 
+function processCompletion(comp) {
+	// all lines which are still within the same function
+	let lines = comp.split('\n');
+	let res = "";
+	for (let i = 0; i < lines.length; i++) {
+		let line = lines[i];
+		try {
+			parse("public class Tester {\n    public void test() {\n        " + res + line + "\n}");
+			return res.substring(0, res.length - 1);
+		} catch (e) {
+			res += line + '\n';
+		}
+	}
+
+	return "";
+}
+
+async function* getTesters(dirPath, useCodex, progress=undefined) {
+	let files = fs.readdirSync(dirPath);
+	let javaFiles = [];
+	let completions = [];
+	let totalFiles = 0;
+
+	for (let i = 0; i < files.length; i++) {
+		if (files[i].endsWith('.java') && !files[i].endsWith('Test.java'))
+			totalFiles++;
+	}
+
+	for (let i = 0; i < files.length; i++) {
+		let file = files[i];
+		if (file.endsWith('.java') && !file.endsWith('Test.java')) {
+			if (progress) {
+				progress.report({
+					message: `Processing ${file}`
+				});
+			}
+
+			if (useCodex) {
+				let comp = await codexCompletion(path.join(dirPath, file));
+				if (comp == undefined) {
+					return;
+				}
+				
+				comp = processCompletion(comp);
+				completions.push(comp);
+			}
+
+			javaFiles.push(path.basename(file, '.java'));
+			yield [javaFiles, completions];
+			if (progress) {
+				progress.report({
+					message: `Processing ${file}`,
+					increment: 100 / totalFiles
+				});
+			}
+		}
+	}
+
+	return [javaFiles, completions];
+}
+
+
 async function createTests() {
+	var config = vscode.workspace.getConfiguration('better-java-tests');
+	var useCodex = config.get('useCodex');
 	
 	await enableTests();
 
@@ -18,45 +86,75 @@ async function createTests() {
 	let filePath = editor.document.fileName;
 	let dirPath = path.dirname(filePath);
 
-	// get all files in the directory
-	let files = fs.readdirSync(dirPath);
-	let javaFiles = [];
-	let completions = [];
-	for (let i = 0; i < files.length && i < 3; i++) {
-		let file = files[i];
-		if (file.endsWith('.java') && !file.endsWith('Test.java')) {
-			if (useCodex) {
-				let comp = await codexCompletion(path.join(dirPath, file));
-				comp = comp.substring(0, comp.indexOf('\n'));
-				completions.push(comp);
+	let res;
+	if (useCodex) {
+		let cancelToken;
+		await vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			cancellable: true,
+			title: 'Loading testers'
+		}, async (progress, cToken) => {
+			progress.report({  increment: 0 });
+			var generator = getTesters(dirPath, useCodex, progress);
+			for await (let [javaFiles, completions] of generator) {
+				res = [javaFiles, completions];
+				cancelToken = cToken;
+				if (cToken.isCancellationRequested) {
+					return;
+				}
 			}
+			// res = await getTesters(dirPath, useCodex, progress);
+			progress.report({ increment: 100 });
+			cancelToken = cToken;
+		});
+		// @ts-ignore
+		if (cancelToken != undefined && cancelToken.isCancellationRequested) {
+			return;
+		}
 
-			javaFiles.push(path.basename(file, '.java'));
+	} else {
+		// res = await getTesters(dirPath, useCodex);
+		let generator = getTesters(dirPath, useCodex);
+		for await (let [javaFiles, completions] of generator) {
+			res = [javaFiles, completions];
 		}
 	}
 
+
+	if (res == undefined) {
+		return;
+	}
+	let javaFiles = res[0];
+	let completions = res[1];
+
 	let testFilePath = path.join(dirPath, 'JavaTest.java');
+
+
 	let testFileContent = `
 import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class JavaTest {`;
 	
+
+
 	for (let i = 0; i < javaFiles.length; i++) {
 		let file = javaFiles[i];
-		let testFuncContent = useCodex ? completions[i] : `        ${file} tester = new ${file}();
-		assertTrue(true);`;
+
+		let testFuncContent = useCodex ? completions[i] : `${file} tester = new ${file}();`;
 
 		testFileContent += `
 	@Test
 	public void test${file}() {
-${testFuncContent}
+		System.out.println("\\n--------------------------- ${file} ---------------------------");
+		${testFuncContent}
 	}
 `;
+
 	}
 
-	testFileContent += `
-}`;
+
+	testFileContent += '\n}';
 
 	// create the test file
 	const wsedit = new vscode.WorkspaceEdit();
@@ -64,6 +162,8 @@ ${testFuncContent}
 	await vscode.workspace.applyEdit(wsedit);
 
 	await vscode.window.showTextDocument(vscode.Uri.file(testFilePath));
+
+	await sleep(500);
 
 	editor = vscode.window.activeTextEditor;
 
@@ -87,23 +187,8 @@ ${testFuncContent}
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "better-java-tests" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
+	console.log('"better-java-tests" loaded.');
 	let disposable = vscode.commands.registerCommand('better-java-tests.createTests', createTests);
-
-	// function () {
-	// 	// The code you place here will be executed every time your command is executed
-
-	// 	// Display a message box to the user
-	// 	vscode.window.showInformationMessage('Hello World from BetterJavaTests!');
-	// }
-
 	context.subscriptions.push(disposable);
 }
 
