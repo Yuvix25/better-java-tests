@@ -130,8 +130,7 @@ async function createTests() {
 	let testFilePath = path.join(dirPath, 'JavaTest.java');
 
 
-	let testFileContent = `
-import org.junit.Test;
+	let testFileContent = `import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class JavaTest {`;
@@ -154,7 +153,7 @@ public class JavaTest {`;
 	}
 
 
-	testFileContent += '\n}';
+	testFileContent += '}';
 
 	// create the test file
 	const wsedit = new vscode.WorkspaceEdit();

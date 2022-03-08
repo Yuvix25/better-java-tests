@@ -25,6 +25,7 @@ async function codexCompletion(file) {
 		text = text.replace("public class", "private class");
 		let prompt = `import org.junit.Test;
 import static org.junit.Assert.*;
+// use asserts when possible
 
 ${text}
 
