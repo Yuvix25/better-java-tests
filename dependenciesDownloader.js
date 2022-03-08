@@ -57,18 +57,33 @@ async function setupUnmanagedFolder(projectUri, testKind=undefined) {
     }
     const libFolder = await getLibFolder(projectUri);
     const libFolderExists = await fse.pathExists(libFolder);
+
+    const all_metadata = getJarIds(testKind);
+    var metadata = [];
     if (!libFolderExists) {
         await fse.ensureDir(libFolder);
     } else {
-        return;
+        for (const jar of all_metadata) {
+            if (!jar.version) {
+                jar.version = await getLatestVersion(jar.groupId, jar.artifactId) || jar.defaultVersion;
+            }
+
+            const jarPath = path.join(libFolder, `${jar.artifactId}-${jar.version}.jar`);
+            if (!(await fse.pathExists(jarPath))) {
+                metadata.push(jar);
+            }
+        }
+        if (metadata.length === 0)
+            return;
     }
+    console.log(all_metadata);
+    console.log(metadata);
 
     try {
         await window.withProgress({
             location: ProgressLocation.Notification,
             cancellable: true
         }, async (progress, token) => {
-            const metadata = getJarIds(testKind);
             for (const jar of metadata) {
                 if (token.isCancellationRequested) {
                     throw new Error('User cancelled');
@@ -76,9 +91,7 @@ async function setupUnmanagedFolder(projectUri, testKind=undefined) {
                 progress.report({
                     message: `Downloading ${jar.artifactId}.jar...`,
                 });
-                if (!jar.version) {
-                    jar.version = await getLatestVersion(jar.groupId, jar.artifactId) || jar.defaultVersion;
-                }
+                
                 await downloadJar(libFolder, jar.groupId, jar.artifactId, jar.version, metadata.length, progress, token);
             }
         });
