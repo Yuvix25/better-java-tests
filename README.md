@@ -4,7 +4,8 @@ Initialize your Java tests more easily - and create them automatically using Ope
 
 ## Requirements
 
- - A working computer.
+ - [Test Runner for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-test) (recommended)
+ - Open AI API key (only for automatic test creation with Codex)
 
 ## Usage
 
