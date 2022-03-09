@@ -3,7 +3,7 @@
 	"publisher": "Yuvix25",
 	"displayName": "Better Java Tests",
 	"description": "An easier interface for the Java Tests.",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Yuvix25/better-java-tests"
