@@ -62,22 +62,21 @@ async function setupUnmanagedFolder(projectUri, testKind=undefined) {
     var metadata = [];
     if (!libFolderExists) {
         await fse.ensureDir(libFolder);
-    } else {
-        for (const jar of all_metadata) {
-            if (!jar.version) {
-                jar.version = await getLatestVersion(jar.groupId, jar.artifactId) || jar.defaultVersion;
-            }
-
-            const jarPath = path.join(libFolder, `${jar.artifactId}-${jar.version}.jar`);
-            if (!(await fse.pathExists(jarPath))) {
-                metadata.push(jar);
-            }
-        }
-        if (metadata.length === 0)
-            return;
     }
-    console.log(all_metadata);
-    console.log(metadata);
+    
+    for (const jar of all_metadata) {
+        if (!jar.version) {
+            jar.version = await getLatestVersion(jar.groupId, jar.artifactId) || jar.defaultVersion;
+        }
+
+        const jarPath = path.join(libFolder, `${jar.artifactId}-${jar.version}.jar`);
+        if (!(await fse.pathExists(jarPath))) {
+            metadata.push(jar);
+        }
+    }
+    if (metadata.length === 0)
+        return;
+    
 
     try {
         await window.withProgress({
